@@ -39,7 +39,7 @@ class SpotifyUpsync:
             history = self.playlist_sync('.', self.input_path, history)
 
         with open(self.JSON_FILE, 'w') as json_file:
-            json.dump(history, json_file)
+            json.dump(history, json_file, sort_keys=True, indent=4)
     
     def playlist_sync(self, dir_name, playlist, history):
         playlist = PurePath(dir_name, playlist)
@@ -66,14 +66,14 @@ class SpotifyUpsync:
                     self.sp.user_playlist_add_tracks(self.USER, playlist_id, track_pack)
 
             else:
-                print(playlist.stem + ' will be modified in Spotify!')
-                
                 local_old_mod_time = 0
                 
                 if playlist.stem in history:
                     local_old_mod_time = history[playlist.stem]
                 
                 if local_old_mod_time < local_cur_mod_time:
+                    print(playlist.stem + ' will be modified in Spotify!')
+                
                     local_track_names = [PurePath(line.replace('\\', '/')).stem for line in lines]
                     local_track_ids = self.query_track(local_track_names)
                     playlist_id = self.sp_playlists_ids[self.sp_playlists_names.index(playlist.stem)]
@@ -84,27 +84,27 @@ class SpotifyUpsync:
                         sp_playlist_tracks_results = self.sp._get(sp_playlist_tracks_results['next'])
                         sp_track_ids += [item['track']['id'] for item in sp_playlist_tracks_results['items']]
 
-                    print('og playlist:', sp_track_ids)
+                    # print('og playlist:', sp_track_ids)
                     remove_tracks, add_tracks, remove_specific_tracks = self.align_tracks(local_track_ids.copy(), sp_track_ids.copy())
 
                     if remove_tracks:
                         self.sp.user_playlist_remove_all_occurrences_of_tracks(self.USER, playlist_id, remove_tracks)
-                        print('current playlist:', [item['track']['id'] for item in self.sp.playlist_tracks(playlist_id)['items']])
+                        # print('current playlist:', [item['track']['id'] for item in self.sp.playlist_tracks(playlist_id)['items']])
                         # print('removed', remove_tracks)
                     if add_tracks:
                         for track in add_tracks:
-                            print(add_tracks[track], len(sp_track_ids))
+                            # print(add_tracks[track], len(sp_track_ids))
                             if add_tracks[track] < len(sp_track_ids):
                                 self.sp.user_playlist_add_tracks(self.USER, playlist_id, [track], add_tracks[track])
                                 sp_track_ids.insert(add_tracks[track], track)
                             else:
                                 self.sp.user_playlist_add_tracks(self.USER, playlist_id, [track])
                                 sp_track_ids.append(add_tracks[track])
-                        print('current playlist:', [item['track']['id'] for item in self.sp.playlist_tracks(playlist_id)['items']])
-                        print('added:', add_tracks)
+                        # print('current playlist:', [item['track']['id'] for item in self.sp.playlist_tracks(playlist_id)['items']])
+                        # print('added:', add_tracks)
                     if remove_specific_tracks:
                         self.sp.user_playlist_remove_specific_occurrences_of_tracks(self.USER, playlist_id, remove_specific_tracks)
-                        print('current playlist:', [item['track']['id'] for item in self.sp.playlist_tracks(playlist_id)['items']])
+                        # print('current playlist:', [item['track']['id'] for item in self.sp.playlist_tracks(playlist_id)['items']])
                         # print('removed:', remove_specific_tracks)
             
             # updates the old time
@@ -138,17 +138,13 @@ class SpotifyUpsync:
         for idx, track_id in enumerate(local_track_ids):
             # print(sp_idx, len(sp_track_ids))
             # we must be adding tracks to playlist if true
-            if idx == len(sp_track_ids):
-                add_tracks[track_id] = idx
-                sp_track_ids.insert(idx, track_id)
-            
-            elif sp_track_ids[idx] != track_id:
+            if idx == len(sp_track_ids) or sp_track_ids[idx] != track_id:
                 add_tracks[track_id] = idx
                 sp_track_ids.insert(idx, track_id)
             # print(idx, len(sp_track_ids))
         
         # finally, all of the out-of-order tracks will be pushed to the bottom, so remove these
-        print('after adding:', sp_track_ids)
+        # print('after adding:', sp_track_ids)
         remove_specific_tracks = [{'uri': track_id, 'positions': [position]} for position, track_id in enumerate(sp_track_ids) if position >= len(local_track_ids)]
         
         return remove_tracks, add_tracks, remove_specific_tracks
